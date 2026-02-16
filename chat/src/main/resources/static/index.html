@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>WebFlux Chat</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 12px; }
+    #log { border: 1px solid #ddd; border-radius: 8px; padding: 12px; height: 55vh; overflow: auto; }
+    .row { display:flex; gap:8px; margin-top:12px; }
+    input { padding:10px; border-radius:8px; border:1px solid #ccc; }
+    button { padding:10px 14px; border-radius:8px; border:1px solid #ccc; cursor:pointer; }
+    #user { width: 180px; }
+    #text { flex:1; }
+    .msg { margin: 6px 0; }
+    .meta { color:#666; font-size: 12px; margin-left: 6px; }
+  </style>
+</head>
+<body>
+
+<h1>WebFlux Chat</h1>
+
+<div id="log"></div>
+
+<div class="row">
+  <input id="user" placeholder="Name (z.B. Patrick)" />
+  <input id="text" placeholder="Nachricht…" />
+  <button id="send">Senden</button>
+</div>
+
+<script>
+  const log = document.getElementById('log');
+  const user = document.getElementById('user');
+  const text = document.getElementById('text');
+  const sendBtn = document.getElementById('send');
+
+  const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/chat";
+  const ws = new WebSocket(wsUrl);
+
+  function addLine(line) {
+    const div = document.createElement('div');
+    div.className = "msg";
+    div.innerHTML = line;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  ws.onopen = () => addLine("<b>verbunden</b>");
+  ws.onclose = () => addLine("<b>getrennt</b>");
+  ws.onerror = () => addLine("<b>Fehler</b>");
+
+  ws.onmessage = (ev) => {
+    try {
+      const m = JSON.parse(ev.data);
+      const t = new Date(m.ts).toLocaleTimeString();
+      addLine(`<b>${escapeHtml(m.user)}:</b> ${escapeHtml(m.text)} <span class="meta">${t}</span>`);
+    } catch {
+      addLine(ev.data);
+    }
+  };
+
+  function send() {
+    const payload = { user: user.value || "anon", text: text.value || "" };
+    ws.send(JSON.stringify(payload));
+    text.value = "";
+    text.focus();
+  }
+
+  sendBtn.onclick = send;
+  text.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+
+  function escapeHtml(s) {
+    return (s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  }
+</script>
+
+</body>
+</html>
